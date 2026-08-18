@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ConversionOptions } from '~/types/video'
 import { useVideoConverter } from '~/composables/useVideoConverter'
 
 const {
@@ -18,8 +19,8 @@ const handleFileSelect = (file: File) => {
   selectFile(file)
 }
 
-const handleStartConversion = async () => {
-  await convert()
+const handleStartConversion = async (options: ConversionOptions) => {
+  await convert(options)
 }
 </script>
 
@@ -42,7 +43,7 @@ const handleStartConversion = async () => {
 
       <!-- Subtitle -->
       <p class="text-slate-400 text-base sm:text-lg leading-relaxed">
-        Convert your WebM videos to MP4 format directly in your browser using FFmpeg.wasm. Simple, fast, and 100% private.
+        Convert your WebM videos to MP4 with full quality control — all locally in your browser.
       </p>
     </header>
 
@@ -94,7 +95,6 @@ const handleStartConversion = async () => {
         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
         <span>Local Client-Side Processing • No Server Uploads</span>
       </div>
-
       <div class="flex items-center gap-4 text-slate-400">
         <span>Powered by Nuxt 3 & FFmpeg.wasm</span>
       </div>
