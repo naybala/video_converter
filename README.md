@@ -2,6 +2,8 @@
 
 A fast, modern, privacy-first browser-based video converter built with Nuxt 3 and FFmpeg.wasm. Convert WebM video files to MP4 format **100% client-side** without uploading video files to any backend server.
 
+🔗 **Live Demo**: [https://vd-converter.netlify.app/](https://vd-converter.netlify.app/)
+
 ---
 
 ## Features
@@ -10,6 +12,7 @@ A fast, modern, privacy-first browser-based video converter built with Nuxt 3 an
 - **Drag & Drop Upload**: Drag & drop your WebM files or use the file picker.
 - **File Validation & Metadata**: Instant validation of file format, MIME type, and size limit (up to 500 MB).
 - **Original Video Preview**: Preview your source WebM video before converting.
+- **Quality Controls**: Configure resolution, CRF quality, frame rate, and audio bitrate before converting.
 - **Real-Time Progress**: Live conversion progress (0–100%) driven by actual FFmpeg WebAssembly events.
 - **MP4 Preview & Download**: Instant video playback of converted MP4 and one-click download.
 - **Clean Developer-Tool Aesthetic**: Sleek dark UI built with Tailwind CSS, responsive on mobile and desktop.
@@ -21,7 +24,7 @@ A fast, modern, privacy-first browser-based video converter built with Nuxt 3 an
 
 - **Framework**: [Nuxt 3](https://nuxt.com/) (Vue 3 Composition API + TypeScript)
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
-- **Core Video Converter**: [FFmpeg.wasm](https://ffmpegwasm.netlify.app/) (`@ffmpeg/ffmpeg`, `@ffmpeg/util`)
+- **Core Video Converter**: [FFmpeg.wasm](https://ffmpegwasm.netlify.app/) (`@ffmpeg/ffmpeg`, `@ffmpeg/util`, `@ffmpeg/core`)
 - **Fonts**: Inter & JetBrains Mono
 
 ---
@@ -31,11 +34,13 @@ A fast, modern, privacy-first browser-based video converter built with Nuxt 3 an
 ```text
 User selects WebM File
         ↓
-Browser initializes FFmpeg.wasm
+Browser initializes FFmpeg.wasm (loaded locally — no CDN)
+        ↓
+User configures quality settings (resolution, CRF, FPS, audio)
         ↓
 FFmpeg virtual filesystem loads WebM data
         ↓
-FFmpeg executes H.264 / AAC conversion
+FFmpeg executes H.264 / AAC conversion with selected options
         ↓
 Generate MP4 Blob & Object URL
         ↓
@@ -93,6 +98,7 @@ Compatible with modern desktop and mobile browsers supporting WebAssembly:
 
 - **Zero Server Uploads**: No backend `/api/upload` or cloud storage endpoints exist.
 - **No Telemetry**: No filenames, metadata, or video bytes are transmitted anywhere.
+- **Local FFmpeg Core**: The FFmpeg WASM binary is served from the same origin — no external CDN requests after first load.
 
 ---
 
@@ -100,15 +106,18 @@ Compatible with modern desktop and mobile browsers supporting WebAssembly:
 
 - Conversion speed depends directly on the user's client hardware and CPU capabilities.
 - Extremely large videos (e.g. >500 MB) may hit browser WebAssembly memory limits (typically 2GB max allocation in V8).
+- FFmpeg.wasm single-threaded core — conversion is sequential, not parallelized.
 
 ---
 
-## Future Improvements
+## Roadmap
 
-- Custom conversion settings (Resolution, CRF quality level, FPS).
-- Audio track extract / strip option.
-- Batch WebM conversion.
-- Progressive Web App (PWA) offline support.
+| Version | Features |
+|---------|----------|
+| **V1** ✅ | WebM → MP4 conversion, drag & drop, preview, download |
+| **V2** ✅ | Quality controls: resolution, CRF, FPS, audio bitrate |
+| **V3** 🔜 | Enhancements: upscale, denoise, sharpen, color adjustment |
+| Future | Batch conversion, PWA offline support |
 
 ---
 

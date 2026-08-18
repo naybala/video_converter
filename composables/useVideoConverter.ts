@@ -1,5 +1,6 @@
 import { ref, shallowRef, computed, onUnmounted } from 'vue'
-import type { ConversionStatus, VideoFileInfo, ConversionError } from '~/types/video'
+import type { ConversionStatus, VideoFileInfo, ConversionError, ConversionOptions } from '~/types/video'
+import { DEFAULT_CONVERSION_OPTIONS } from '~/types/video'
 
 // Configurable constants
 export const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500 MB
@@ -183,7 +184,31 @@ export function useVideoConverter() {
   }
 
   /**
-   * Run ffmpeg.exec and return {exitCode, logs}
+   * Build the FFmpeg -vf filter string from conversion options.
+   * Always ensures dimensions are divisible by 2 (H.264 requirement).
+   */
+  const buildVfFilter = (opts: ConversionOptions): string => {
+    const filters: string[] = []
+
+    // Scale filter — round to even dimensions for H.264 compatibility
+    if (opts.resolution === 'original') {
+      filters.push('scale=trunc(iw/2)*2:trunc(ih/2)*2')
+    } else {
+      // Target width, auto-height preserving aspect ratio (divisible by 2 via -2)
+      const [targetW] = opts.resolution.split('x')
+      filters.push(`scale=${targetW}:-2`)
+    }
+
+    // FPS filter
+    if (opts.fps !== 'original') {
+      filters.push(`fps=${opts.fps}`)
+    }
+
+    return filters.join(',')
+  }
+
+  /**
+   * Run ffmpeg.exec and return exit code
    */
   const runExec = async (ffmpeg: any, args: string[]): Promise<number> => {
     const code: number = await ffmpeg.exec(args)
@@ -191,11 +216,11 @@ export function useVideoConverter() {
   }
 
   /**
-   * Convert WebM to MP4 with audio fallback chain:
-   *   1. VP9/VP8 + Opus→AAC  (most common screencast format)
+   * Convert WebM to MP4 with quality options and audio fallback chain:
+   *   1. H.264 + AAC with user-specified options
    *   2. Video-only (strips audio if AAC encode fails)
    */
-  const convert = async (): Promise<boolean> => {
+  const convert = async (opts: ConversionOptions = DEFAULT_CONVERSION_OPTIONS): Promise<boolean> => {
     if (!selectedFile.value) {
       error.value = { title: 'No File Selected', message: 'Please select a WebM video to convert.' }
       return false
@@ -224,18 +249,18 @@ export function useVideoConverter() {
       await ffmpeg.writeFile(inputName, fileData)
 
       // ── Strategy 1: Full conversion with audio (H.264 + AAC) ─────────────
-      // -pix_fmt yuv420p is required for browser HTML5 playback compatibility
-      // scale=trunc(iw/2)*2:trunc(ih/2)*2 rounds odd pixel dimensions to even —
-      //   H.264 (libx264) requires both width and height to be divisible by 2.
-      console.log('[FFmpeg] Trying: H.264 + AAC...')
+      // CRF controls quality (lower = better). Scale filter ensures even dimensions.
+      const vfFilter = buildVfFilter(opts)
+      console.log(`[FFmpeg] Trying: H.264 + AAC | vf=${vfFilter} crf=${opts.crf} audio=${opts.audioBitrate}`)
       let exitCode: number = await runExec(ffmpeg, [
         '-i', inputName,
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-pix_fmt', 'yuv420p',
-        '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+        '-crf', String(opts.crf),
+        '-vf', vfFilter,
         '-c:a', 'aac',
-        '-b:a', '128k',
+        '-b:a', opts.audioBitrate,
         '-movflags', '+faststart',
         outputName
       ])
@@ -245,7 +270,6 @@ export function useVideoConverter() {
       // strip audio and produce a silent MP4 which will still play fine.
       if (exitCode !== 0) {
         console.warn(`[FFmpeg] Audio strategy failed (exit ${exitCode}). Retrying video-only...`)
-        // Clean up any partial output from failed attempt
         try { await ffmpeg.deleteFile(outputName) } catch (_) {}
 
         exitCode = await runExec(ffmpeg, [
@@ -253,7 +277,8 @@ export function useVideoConverter() {
           '-c:v', 'libx264',
           '-preset', 'ultrafast',
           '-pix_fmt', 'yuv420p',
-          '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+          '-crf', String(opts.crf),
+          '-vf', vfFilter,
           '-an',
           '-movflags', '+faststart',
           outputName

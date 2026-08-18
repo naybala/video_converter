@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import type { VideoFileInfo } from '~/types/video'
+import { ref } from 'vue'
+import type { VideoFileInfo, ConversionOptions } from '~/types/video'
+import { DEFAULT_CONVERSION_OPTIONS } from '~/types/video'
 import { formatFileSize } from '~/utils/formatFileSize'
 
 defineProps<{
@@ -8,9 +10,11 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'start-conversion'): void
+  (e: 'start-conversion', options: ConversionOptions): void
   (e: 'change-file'): void
 }>()
+
+const options = ref<ConversionOptions>({ ...DEFAULT_CONVERSION_OPTIONS })
 </script>
 
 <template>
@@ -50,18 +54,23 @@ const emit = defineEmits<{
     </div>
 
     <!-- Video Preview Frame -->
-    <div class="relative bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-inner mb-6 flex items-center justify-center min-h-[220px]">
+    <div class="relative bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-inner mb-5 flex items-center justify-center min-h-[200px]">
       <video
         :key="fileInfo.objectUrl"
         controls
         preload="metadata"
         playsinline
-        class="w-full max-h-[380px] object-contain rounded-xl"
+        class="w-full max-h-[340px] object-contain rounded-xl"
         style="max-width: 100%;"
       >
         <source :src="fileInfo.objectUrl" :type="fileInfo.type || 'video/webm'" />
         Your browser does not support the video tag.
       </video>
+    </div>
+
+    <!-- ── V2: Quality Settings Panel ───────────────────────────────── -->
+    <div class="mb-5">
+      <ConversionOptions v-model="options" />
     </div>
 
     <!-- Primary Action Button -->
@@ -70,7 +79,7 @@ const emit = defineEmits<{
         type="button"
         class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/25 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
         :disabled="isLoadingFfmpeg"
-        @click="emit('start-conversion')"
+        @click="emit('start-conversion', options)"
       >
         <svg v-if="!isLoadingFfmpeg" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
