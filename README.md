@@ -116,7 +116,7 @@ Compatible with modern desktop and mobile browsers supporting WebAssembly:
 |---------|----------|
 | **V1** ✅ | WebM → MP4 conversion, drag & drop, preview, download |
 | **V2** ✅ | Quality controls: resolution, CRF, FPS, audio bitrate |
-| **V3** 🔜 | Enhancements: upscale, denoise, sharpen, color adjustment |
+| **V3** ✅ | Enhancements: upscale (Lanczos), denoise, sharpen, color adjustment |
 | Future | Batch conversion, PWA offline support |
 
 ---

@@ -186,22 +186,65 @@ export function useVideoConverter() {
   /**
    * Build the FFmpeg -vf filter string from conversion options.
    * Always ensures dimensions are divisible by 2 (H.264 requirement).
+   * V3: chains enhancement filters (upscale, denoise, sharpen, color eq) after scale.
    */
   const buildVfFilter = (opts: ConversionOptions): string => {
     const filters: string[] = []
+    const e = opts.enhance
 
-    // Scale filter — round to even dimensions for H.264 compatibility
-    if (opts.resolution === 'original') {
-      filters.push('scale=trunc(iw/2)*2:trunc(ih/2)*2')
-    } else {
-      // Target width, auto-height preserving aspect ratio (divisible by 2 via -2)
+    // ── Scale / Upscale ─────────────────────────────────────────────────
+    if (opts.resolution !== 'original') {
+      // Explicit resolution: scale to target width, auto-height (lanczos for quality, -2 guarantees even height)
       const [targetW] = opts.resolution.split('x')
-      filters.push(`scale=${targetW}:-2`)
+      filters.push(`scale=${targetW}:-2:flags=lanczos`)
+    } else if (e.upscale !== 'none') {
+      // Upscale relative to source using high-quality lanczos algorithm
+      // trunc(.../2)*2 guarantees both width and height are divisible by 2 for H.264
+      const factor = e.upscale.replace('x', '')
+      filters.push(`scale=trunc(iw*${factor}/2)*2:trunc(ih*${factor}/2)*2:flags=lanczos`)
+    } else {
+      // Original dimensions — just ensure even pixel count for H.264
+      filters.push('scale=trunc(iw/2)*2:trunc(ih/2)*2')
     }
 
-    // FPS filter
+    // ── FPS ─────────────────────────────────────────────────────────────
     if (opts.fps !== 'original') {
       filters.push(`fps=${opts.fps}`)
+    }
+
+    // ── Denoise (hqdn3d) ────────────────────────────────────────────
+    // Strength 1-100 maps to: luma_spatial 0.08-8, luma_temporal 0.12-12
+    if (e.denoiseStrength > 0) {
+      const s = e.denoiseStrength / 100
+      const ls = (s * 8).toFixed(1)
+      const cs = (s * 6).toFixed(1)
+      const lt = (s * 12).toFixed(1)
+      const ct = (s * 9).toFixed(1)
+      filters.push(`hqdn3d=${ls}:${cs}:${lt}:${ct}`)
+    }
+
+    // ── Sharpen (unsharp) ──────────────────────────────────────────
+    // Strength 1-100 maps to luma_amount 0.1-1.5, chroma_amount 0.05-0.75
+    if (e.sharpenStrength > 0) {
+      const lumaAmt   = (e.sharpenStrength / 100 * 1.5).toFixed(2)
+      const chromaAmt = (e.sharpenStrength / 100 * 0.75).toFixed(2)
+      filters.push(`unsharp=5:5:${lumaAmt}:5:5:${chromaAmt}`)
+    }
+
+    // ── Color adjustments (eq) ──────────────────────────────────────
+    // brightness: user -100→0 to ffmpeg -1.0→0 (0=no change)
+    // contrast:   user -100..+100 to ffmpeg 0.0..2.0 (0 center = 1.0)
+    // saturation: user -100..+100 to ffmpeg 0.0..2.0 (0 center = 1.0)
+    // gamma:      user -50..+50 to ffmpeg ~0.33..3.0 (0 center = 1.0)
+    const needsEq = e.brightness !== 0 || e.contrast !== 0 || e.saturation !== 0 || e.gamma !== 0
+    if (needsEq) {
+      const brightness = (e.brightness / 100).toFixed(3)
+      const contrast   = (1 + e.contrast / 100).toFixed(3)
+      const saturation = (1 + e.saturation / 100).toFixed(3)
+      const gamma      = e.gamma >= 0
+        ? (1 + e.gamma / 50 * 2).toFixed(3)
+        : (1 / (1 + Math.abs(e.gamma) / 50 * 2)).toFixed(3)
+      filters.push(`eq=brightness=${brightness}:contrast=${contrast}:saturation=${saturation}:gamma=${gamma}`)
     }
 
     return filters.join(',')
